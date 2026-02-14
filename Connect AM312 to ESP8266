@@ -1,0 +1,22 @@
+const int sensorPin = 12; // Пин D6 (GPIO12) для OUT датчика AM312
+const int ledPin = LED_BUILTIN; // Встроенный светодиод на ESP8266 (обычно GPIO2)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  pinMode(sensorPin, INPUT); // Настройка пина датчика как вход
+  pinMode(ledPin, OUTPUT); // Настройка пина светодиода как выход
+  digitalWrite(ledPin, HIGH); // Выключаем светодиод (LOW для включения на большинстве плат)
+  Serial.println("Мониторинг датчика движения AM312...");
+}
+
+void loop() {
+  int sensorValue = digitalRead(sensorPin); // Чтение значения с датчика
+  if (sensorValue == HIGH) {
+    Serial.println("Движение обнаружено!");
+    digitalWrite(ledPin, LOW); // Включаем светодиод
+  } else {
+    Serial.println("Движение не обнаружено.");
+    digitalWrite(ledPin, HIGH); // Выключаем светодиод
+  }
+  delay(100); // Задержка для предотвращения слишком частых опросов
+}
