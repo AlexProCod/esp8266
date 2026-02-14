@@ -1,0 +1,27 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#define RST_PIN D3 // Пин RST
+#define SS_PIN D8  // Пин SDA (SS)
+
+MFRC522 rfid(SS_PIN, RST_PIN); // Создаем объект MFRC522
+ 
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  SPI.begin();          // Инициализация SPI
+  rfid.PCD_Init();      // Инициализация RC522
+  Serial.println("Приложите RFID-метку к считывателю...");
+}
+
+void loop() {
+  // Проверяем наличие новой метки
+  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+    Serial.print("UID метки: ");
+    for (byte i = 0; i < rfid.uid.size; i++) {
+      Serial.print(rfid.uid.uidByte[i] < 0x10 ? " 0" : " ");
+      Serial.print(rfid.uid.uidByte[i], HEX);
+    }
+    Serial.println();
+    rfid.PICC_HaltA(); // Останавливаем чтение
+  }
+  delay(100);
+}
