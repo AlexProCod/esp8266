@@ -1,0 +1,32 @@
+#include <DHT.h>
+
+#define DHTPIN 2 // Пин D4 (GPIO2) для линии данных DHT11
+#define DHTTYPE DHT11 // Тип датчика (DHT11)
+
+DHT dht(DHTPIN, DHTTYPE); // Создаем объект DHT
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  dht.begin(); // Инициализация датчика DHT11
+  Serial.println("Мониторинг температуры и влажности с DHT11...");
+}
+
+void loop() {
+  delay(2000); // Задержка 2 секунды (DHT11 требует не менее 1–2 секунд между опросами)
+
+  float humidity = dht.readHumidity(); // Чтение влажности
+  float temperature = dht.readTemperature(); // Чтение температуры в °C
+
+  // Проверка на успешное чтение
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Ошибка: Не удалось прочитать данные с DHT11!");
+    return;
+  }
+
+  Serial.print("Влажность: ");
+  Serial.print(humidity);
+  Serial.print(" % | Температура: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
+
+}
