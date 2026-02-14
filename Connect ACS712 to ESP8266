@@ -1,0 +1,25 @@
+const int sensorPin = A0; // Пин аналогового входа
+const float sensitivity = 0.185; // Чувствительность датчика ACS712-05B (185 мВ/А)
+const float vRef = 3.3; // Опорное напряжение ESP8266 (3.3 В)
+const float vcc = 5.0; // Напряжение питания ACS712 (5 В)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  Serial.println("Измерение тока с ACS712...");
+}
+
+void loop() {
+  int rawValue = analogRead(sensorPin); // Чтение значения с A0
+  float voltage = (rawValue / 1023.0) * vRef; // Преобразование в напряжение
+  float current = (voltage - (vcc / 2)) / sensitivity; // Вычисление тока
+
+  Serial.print("Аналоговое значение: ");
+  Serial.print(rawValue);
+  Serial.print(" | Напряжение: ");
+  Serial.print(voltage);
+  Serial.print(" В | Ток: ");
+  Serial.print(current);
+  Serial.println(" А");
+
+  delay(1000); // Задержка 1 секунда
+}
