@@ -1,0 +1,207 @@
+/*********************************************************************
+  УМНЫЙ ДОМ: Дверь + Движение + Температура + Реле + Telegram
+  ESP8266 | OLED | DS18B20 | AM312 | Геркон | Реле
+  TechLab LV | 16.11.2025
+*********************************************************************/
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h>
+#include <ArduinoJson.h>
+
+// === НАСТРОЙКИ ===
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+
+#define ONE_WIRE_BUS  14   // D5
+#define MOTION_PIN    12   // D6
+#define REED_PIN       0   // D3 – геркон
+#define RELAY_PIN     13   // D7 – реле (HIGH = ON)
+
+#define DEBOUNCE_DELAY     1000
+#define WIFI_TIMEOUT       10000
+#define DOOR_MSG_COOLDOWN  2000
+
+// Wi-Fi
+const char* ssid     = "YOUR_SSID";
+const char* password = "YOUR_PASSWORD";
+
+// Telegram
+#define BOTtoken "YOUR_BOT_TOKEN"
+#define CHAT_ID  "YOUR_CHAT_ID"
+
+// === ОБЪЕКТЫ ===
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+X509List cert(TELEGRAM_CERTIFICATE_ROOT);
+WiFiClientSecure client;
+UniversalTelegramBot bot(BOTtoken, client);
+
+// === ПЕРЕМЕННЫЕ ===
+unsigned long lastMotionTime = 0;
+bool motionDetected = false;
+
+unsigned long motionTimestamps[2] = {0, 0};
+int motionCount = 0;
+unsigned long lastNoMotionTime = 0;
+
+bool relayState = false;
+
+// --- Дверь ---
+bool lastReedState = HIGH;
+bool doorWasOpen = false;
+unsigned long lastDoorMsgTime = 0;
+
+bool telegramOK = false;
+
+// === ФУНКЦИИ ===
+void sendTelegram(const String &msg) {
+  if (!telegramOK) return;
+  Serial.print(F("TG → "));
+  Serial.println(msg);
+  bot.sendMessage(CHAT_ID, msg, "");
+}
+
+void updateDisplay(float temp, bool motion, bool doorClosed) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.print(F("Temp: ")); display.print(temp, 1); display.println(F(" C"));
+  display.print(F("Motion: ")); display.println(motion ? F("YES") : F("NO"));
+  display.print(F("Door: ")); display.println(doorClosed ? F("CLOSED") : F("OPEN"));
+  display.print(F("Relay: ")); display.println(relayState ? F("ON ") : F("OFF"));
+  display.display();
+}
+
+// === SETUP ===
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("\n=== SMART HOME START ==="));
+
+  // Пины
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+  delay(50);
+
+  pinMode(MOTION_PIN, INPUT);
+  pinMode(REED_PIN, INPUT_PULLUP);
+  lastReedState = digitalRead(REED_PIN);
+
+  // I2C
+  Wire.begin(D2, D1);
+  Wire.setClock(100000);
+
+  // OLED
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("OLED failed!"));
+    while (1);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+  display.println(F("Starting..."));
+  display.display();
+
+  // DS18B20
+  sensors.begin();
+
+  // Wi-Fi + Telegram
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  client.setTrustAnchors(&cert);
+  client.setInsecure();
+
+  unsigned long t = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t < WIFI_TIMEOUT) {
+    delay(500); Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi: " + WiFi.localIP().toString());
+    telegramOK = true;
+    sendTelegram("Система умного дома запущена!");
+  } else {
+    Serial.println("\nWiFi failed");
+  }
+}
+
+// === LOOP ===
+void loop() {
+  unsigned long now = millis();
+
+  // Температура
+  sensors.requestTemperatures();
+  float tempC = sensors.getTempCByIndex(0);
+  if (tempC == DEVICE_DISCONNECTED_C) tempC = -127.0;
+
+  // Дверь
+  int reed = digitalRead(REED_PIN);
+  bool doorClosed = (reed == LOW);
+
+  if (reed != lastReedState && (now - lastDoorMsgTime > DOOR_MSG_COOLDOWN)) {
+    if (reed == HIGH) {
+      sendTelegram("Дверь открыта!");
+      Serial.println(F("DOOR OPEN"));
+      doorWasOpen = true;
+    } else {
+      sendTelegram("Дверь закрыта!");
+      Serial.println(F("DOOR CLOSED"));
+    }
+    lastDoorMsgTime = now;
+  }
+  lastReedState = reed;
+
+  // Движение
+  int motion = digitalRead(MOTION_PIN);
+  if (motion == HIGH && now - lastMotionTime > DEBOUNCE_DELAY) {
+    motionTimestamps[0] = motionTimestamps[1];
+    motionTimestamps[1] = now;
+    motionCount = min(motionCount + 1, 2);
+    lastMotionTime = now;
+    motionDetected = true;
+
+    if (motionCount >= 2 && motionTimestamps[1] - motionTimestamps[0] <= 3000) {
+      if (!relayState) {
+        digitalWrite(RELAY_PIN, HIGH);
+        relayState = true;
+        sendTelegram("Реле включено (2 движения)");
+      }
+    }
+
+    if (doorWasOpen && !relayState) {
+      digitalWrite(RELAY_PIN, HIGH);
+      relayState = true;
+      sendTelegram("Реле включено (дверь + движение)");
+      doorWasOpen = false;
+    }
+    lastNoMotionTime = now;
+  } else if (motion == LOW) {
+    motionDetected = false;
+    if (now - lastNoMotionTime > 5000 && relayState) {
+      digitalWrite(RELAY_PIN, LOW);
+      relayState = false;
+      sendTelegram("Реле выключено");
+      motionCount = 0;
+    }
+  }
+
+  // Дисплей
+  updateDisplay(tempC, motionDetected, doorClosed);
+
+  // Лог
+  Serial.print(F("R:")); Serial.print(reed);
+  Serial.print(F(" M:")); Serial.print(motion);
+  Serial.print(F(" Rel:")); Serial.println(relayState);
+
+  delay(100);
+}
