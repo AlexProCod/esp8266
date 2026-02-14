@@ -1,0 +1,34 @@
+#include <Wire.h>
+#include <Adafruit_ADS1X15.h>
+
+Adafruit_ADS1115 ads; // Создаем объект ADS1115 (для 16-битного АЦП)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  // Инициализация ADS1115
+  if (!ads.begin(0x48)) { // I2C-адрес 0x48 (ADDR к GND)
+    Serial.println("Ошибка инициализации ADS1115!");
+    while (1); // Остановка, если модуль не найден
+  }
+  
+  // Настройка усиления (диапазон входного напряжения)
+  ads.setGain(GAIN_TWOTHIRDS); // ±6.144 В (по умолчанию)
+  // Другие варианты усиления:
+  // GAIN_ONE (±4.096 В), GAIN_TWO (±2.048 В), GAIN_FOUR (±1.024 В), 
+  // GAIN_EIGHT (±0.512 В), GAIN_SIXTEEN (±0.256 В)
+
+  Serial.println("Мониторинг аналогового сигнала с ADS1115...");
+}
+
+void loop() {
+  int16_t adc0 = ads.readADC_SingleEnded(0); // Чтение с канала A0
+  float voltage = ads.computeVolts(adc0); // Преобразование в напряжение
+
+  Serial.print("Канал A0: ");
+  Serial.print(adc0);
+  Serial.print(" | Напряжение: ");
+  Serial.print(voltage);
+  Serial.println(" В");
+
+  delay(1000); // Задержка 1 секунда
+}
