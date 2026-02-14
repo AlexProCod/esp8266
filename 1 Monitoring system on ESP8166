@@ -1,0 +1,109 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+#define SCREEN_WIDTH 128 // Ширина дисплея в пикселях
+#define SCREEN_HEIGHT 64 // Высота дисплея в пикселях (измените на 32, если дисплей 128x32)
+#define OLED_RESET -1 // Пин сброса (не используется в I2C)
+#define ONE_WIRE_BUS 14 // Пин D5 (GPIO14) для DS18B20
+#define MOTION_PIN 12 // Пин D6 (GPIO12) для AM312
+#define REED_PIN 0 // Пин D3 (GPIO0) для геркона
+#define DEBOUNCE_DELAY 1000 // Задержка для защиты от дребезга (мс)
+
+// Инициализация дисплея с I2C-адресом 0x3C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// Инициализация шины OneWire
+OneWire oneWire(ONE_WIRE_BUS);
+// Передаем OneWire в библиотеку DallasTemperature
+DallasTemperature sensors(&oneWire);
+
+unsigned long lastMotionTime = 0; // Время последнего срабатывания датчика движения
+bool motionDetected = false; // Флаг состояния движения
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial для отладки
+  Wire.begin(D2, D1); // Явная инициализация I2C: SDA = D2 (GPIO4), SCL = D1 (GPIO5)
+  Wire.setClock(100000); // Установка частоты I2C 100 кГц для стабильности
+
+  // Инициализация дисплея
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Попробуйте 0x3D, если 0x3C не работает
+    Serial.println(F("Ошибка инициализации SSD1306! Проверьте подключение или адрес."));
+    while (1); // Остановка, если дисплей не найден
+  }
+  Serial.println(F("Дисплей SSD1306 успешно инициализирован!"));
+
+  // Инициализация датчика температуры
+  sensors.begin();
+  if (sensors.getDeviceCount() == 0) {
+    Serial.println(F("DS18B20 не найден! Проверьте подключение."));
+  } else {
+    Serial.println(F("DS18B20 успешно найден."));
+  }
+
+  // Настройка пинов датчиков
+  pinMode(MOTION_PIN, INPUT); // Датчик движения AM312
+  pinMode(REED_PIN, INPUT_PULLUP); // Геркон с подтягивающим резистором
+
+  // Тестовый вывод на дисплей
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("OLED Test"));
+  display.println(F("System Start"));
+  display.display();
+  Serial.println(F("Тестовый текст отправлен на дисплей."));
+  delay(2000);
+}
+
+void loop() {
+  // Чтение температуры
+  sensors.requestTemperatures();
+  float tempC = sensors.getTempCByIndex(0); // Получаем температуру в °C
+  if (tempC == DEVICE_DISCONNECTED_C) {
+    tempC = -127.0; // Ошибка датчика
+    Serial.println(F("Ошибка чтения DS18B20!"));
+  }
+
+  // Чтение состояния геркона
+  int reedState = digitalRead(REED_PIN); // LOW - магнит рядом, HIGH - магнит отсутствует
+
+  // Чтение состояния датчика движения
+  int motionState = digitalRead(MOTION_PIN); // HIGH - движение, LOW - нет движения
+  unsigned long currentTime = millis();
+  if (motionState == HIGH && (currentTime - lastMotionTime > DEBOUNCE_DELAY)) {
+    motionDetected = true;
+    lastMotionTime = currentTime;
+    Serial.println(F("Движение обнаружено!"));
+  } else if (motionState == LOW) {
+    motionDetected = false;
+    Serial.println(F("Движение не обнаружено."));
+  }
+
+  // Формирование строк для отображения
+  String tempStr = "Temp: " + String(tempC, 1) + " C";
+  String motionStr = "Motion: " + String(motionDetected ? "Detected" : "None");
+  String reedStr = "Reed: " + String(reedState == LOW ? "Closed" : "Open");
+
+  // Вывод на дисплей
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(tempStr);
+  display.println(motionStr);
+  display.println(reedStr);
+  display.display();
+
+  // Вывод в Serial для диагностики
+  Serial.print(F("Raw Motion Pin (GPIO12): "));
+  Serial.println(motionState);
+  Serial.println(tempStr);
+  Serial.println(motionStr);
+  Serial.println(reedStr);
+  Serial.println(F("---"));
+
+  delay(100); // Задержка для обновления
+}
