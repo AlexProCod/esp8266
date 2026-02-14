@@ -1,0 +1,36 @@
+const int sensorPin = A0; // Аналоговый вход для фоторезистора
+const int ledPin = LED_BUILTIN; // Встроенный светодиод (обычно GPIO2)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  pinMode(ledPin, OUTPUT); // Настройка пина светодиода как выход
+  digitalWrite(ledPin, HIGH); // Выключаем светодиод (LOW для включения на большинстве плат)
+  Serial.println("Мониторинг освещенности с GL5516...");
+}
+
+void loop() {
+  int sensorValue = analogRead(sensorPin); // Чтение аналогового сигнала
+  float voltage = sensorValue * (3.3 / 1023.0); // Преобразование в напряжение
+
+  // Условная оценка уровня освещенности
+  String lightLevel;
+  if (sensorValue < 200) {
+    lightLevel = "Темно";
+    digitalWrite(ledPin, LOW); // Включаем светодиод
+  } else if (sensorValue < 600) {
+    lightLevel = "Средний уровень света";
+    digitalWrite(ledPin, HIGH); // Выключаем светодиод
+  } else {
+    lightLevel = "Ярко";
+    digitalWrite(ledPin, HIGH); // Выключаем светодиод
+  }
+
+  Serial.print("Аналоговое значение: ");
+  Serial.print(sensorValue);
+  Serial.print(" | Напряжение: ");
+  Serial.print(voltage);
+  Serial.print(" В | Уровень освещенности: ");
+  Serial.println(lightLevel);
+
+  delay(500); // Задержка 0.5 секунды
+}
