@@ -1,0 +1,33 @@
+const int analogPin = A0; // Аналоговый выход KY-038
+const int digitalPin = 4; // Цифровой выход KY-038 (D2, GPIO4)
+const int ledPin = LED_BUILTIN; // Встроенный светодиод (обычно GPIO2)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  pinMode(digitalPin, INPUT); // Настройка цифрового пина как вход
+  pinMode(ledPin, OUTPUT); // Настройка пина светодиода как выход
+  digitalWrite(ledPin, HIGH); // Выключаем светодиод (LOW для включения на большинстве плат)
+  Serial.println("Мониторинг звука с KY-038...");
+}
+
+void loop() {
+  int analogValue = analogRead(analogPin); // Чтение аналогового сигнала
+  float voltage = analogValue * (3.3 / 1023.0); // Преобразование в напряжение (для 3.3 В)
+  int digitalValue = digitalRead(digitalPin); // Чтение цифрового сигнала
+
+  Serial.print("Аналоговое значение: ");
+  Serial.print(analogValue);
+  Serial.print(" | Напряжение: ");
+  Serial.print(voltage);
+  Serial.print(" В | Цифровой сигнал: ");
+  Serial.println(digitalValue == HIGH ? "Звук обнаружен" : "Тишина");
+
+  // Управление светодиодом по цифровому сигналу
+  if (digitalValue == HIGH) {
+    digitalWrite(ledPin, LOW); // Включаем светодиод
+  } else {
+    digitalWrite(ledPin, HIGH); // Выключаем светодиод
+  }
+
+  delay(100); // Задержка для предотвращения слишком частых опросов
+}
