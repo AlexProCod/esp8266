@@ -1,0 +1,25 @@
+const int sensorPin = A0; // Пин аналогового входа
+const float vRef = 3.3; // Опорное напряжение ESP8266 (3.3 В)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  Serial.println("Мониторинг качества воздуха с MQ135...");
+}
+
+void loop() {
+  int rawValue = analogRead(sensorPin); // Чтение значения с A0
+  float voltage = (rawValue / 1023.0) * vRef; // Преобразование в напряжение
+
+  Serial.print("Аналоговое значение: ");
+  Serial.print(rawValue);
+  Serial.print(" | Напряжение: ");
+  Serial.print(voltage);
+  Serial.println(" В");
+
+  // Базовая оценка качества воздуха (пример, требует калибровки)
+  float airQuality = rawValue; // Условное значение (для точности нужна калибровка)
+  Serial.print("Качество воздуха (условные единицы): ");
+  Serial.println(airQuality);
+
+  delay(1000); // Задержка 1 секунда
+}
