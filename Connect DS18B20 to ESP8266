@@ -1,0 +1,31 @@
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+#define ONE_WIRE_BUS 2 // Пин D4 (GPIO2) для линии данных DS18B20
+
+// Создаем объект OneWire для связи
+OneWire oneWire(ONE_WIRE_BUS);
+
+// Передаем объект OneWire в DallasTemperature
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  sensors.begin(); // Инициализация датчиков DS18B20
+  Serial.println("Мониторинг температуры с DS18B20...");
+}
+
+void loop() {
+  sensors.requestTemperatures(); // Запрос температуры
+  float tempC = sensors.getTempCByIndex(0); // Получение температуры в градусах Цельсия
+
+  if (tempC != DEVICE_DISCONNECTED_C) { // Проверка на успешное чтение
+    Serial.print("Температура: ");
+    Serial.print(tempC);
+    Serial.println(" °C");
+  } else {
+    Serial.println("Ошибка: Не удалось прочитать температуру!");
+  }
+
+  delay(1000); // Задержка 1 секунда
+}
