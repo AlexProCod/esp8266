@@ -1,0 +1,22 @@
+const int reedPin = 4; // Пин D2 (GPIO4) для геркона
+const int ledPin = LED_BUILTIN; // Встроенный светодиод (обычно GPIO2)
+
+void setup() {
+  Serial.begin(115200); // Инициализация Serial
+  pinMode(reedPin, INPUT_PULLUP); // Настройка пина геркона как вход с подтяжкой
+  pinMode(ledPin, OUTPUT); // Настройка пина светодиода как выход
+  digitalWrite(ledPin, HIGH); // Выключаем светодиод (LOW для включения на большинстве плат)
+  Serial.println("Мониторинг магнитного геркона...");
+}
+
+void loop() {
+  int reedState = digitalRead(reedPin); // Чтение состояния геркона
+  if (reedState == LOW) { // Замкнуто (магнит рядом)
+    Serial.println("Геркон замкнут (дверь закрыта)");
+    digitalWrite(ledPin, LOW); // Включаем светодиод
+  } else { // Разомкнуто (магнит далеко)
+    Serial.println("Геркон разомкнут (дверь открыта)");
+    digitalWrite(ledPin, HIGH); // Выключаем светодиод
+  }
+  delay(200); // Задержка для предотвращения слишком частых опросов
+}
